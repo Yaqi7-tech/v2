@@ -240,28 +240,50 @@ function displayMessage(sender, content, type) {
 
 // 显示评价
 function displayEvaluation(evaluation) {
+    console.log('displayEvaluation收到的评价对象:', evaluation);
+
     appState.currentEvaluation = evaluation;
     appState.evaluationHistory.unshift({
         ...evaluation,
         timestamp: new Date()
     });
 
+    // 确保评价对象结构完整
+    const safeEvaluation = {
+        综合得分: evaluation.综合得分 || 3,
+        总体评价: evaluation.总体评价 || '暂无评价',
+        建议: evaluation.建议 || '暂无建议',
+        跳步判断: evaluation.跳步判断 || {
+            是否跳步: false,
+            跳步类型: "无",
+            督导建议: "无跳步问题"
+        }
+    };
+
+    console.log('处理后的评价对象:', safeEvaluation);
+
     // 解析跳步判断
-    const skipStep = evaluation.跳步判断 || {};
+    const skipStep = safeEvaluation.跳步判断 || {};
     const hasSkipStep = skipStep.是否跳步 || false;
 
     // 更新当前评价显示
     elements.evaluationContainer.innerHTML = `
         <div class="evaluation">
             <div class="evaluation-header">
-                <div class="score ${getScoreClass(evaluation.综合得分 || 3)}">${evaluation.综合得分 || 3}</div>
+                <div class="score ${getScoreClass(safeEvaluation.综合得分 || 3)}">${safeEvaluation.综合得分 || 3}</div>
                 <div class="evaluation-title">督导评价</div>
             </div>
             <div class="evaluation-content">
-                <strong>总体评价：</strong>${evaluation.总体评价 || '暂无评价'}
+                <div class="evaluation-section">
+                    <strong>总体评价：</strong>
+                    <div class="evaluation-text">${safeEvaluation.总体评价 || '暂无评价'}</div>
+                </div>
             </div>
             <div class="evaluation-suggestions">
-                <strong>建议：</strong>${evaluation.建议 || '暂无建议'}
+                <div class="evaluation-section">
+                    <strong>建议：</strong>
+                    <div class="evaluation-text">${safeEvaluation.建议 || '暂无建议'}</div>
+                </div>
             </div>
             ${hasSkipStep ? `
                 <div class="skip-step-warning">
