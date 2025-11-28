@@ -1,0 +1,23 @@
+{
+  "name": "counseling-simulation-system",
+  "version": "1.0.0",
+  "description": "心理咨询模拟系统",
+  "main": "proxy-server.js",
+  "scripts": {
+    "start": "node proxy-server.js",
+    "dev": "node proxy-server.js",
+    "build": "echo 'Build completed'"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "http-proxy-middleware": "^2.0.6",
+    "node-fetch": "^2.7.0"
+  },
+  "keywords": ["counseling", "simulation", "dify", "ai"],
+  "author": "Your Name",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

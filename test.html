@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心理咨询模拟系统 - 调试版本</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .debug-info {
+            background-color: #e8f4f8;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: inherit;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        #consoleOutput {
+            background-color: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>心理咨询模拟系统 - 调试版本</h1>
+
+        <div class="debug-info">
+            <h3>调试信息</h3>
+            <p id="status">状态: 正在初始化...</p>
+            <p id="elementsStatus">DOM元素状态: 检查中...</p>
+        </div>
+
+        <div>
+            <h3>测试功能</h3>
+            <button onclick="testAPI()">测试API连接</button>
+            <button onclick="testConversation()">测试对话流程</button>
+            <button onclick="clearConsole()">清空控制台</button>
+        </div>
+
+        <div>
+            <h3>测试输入框</h3>
+            <textarea id="testInput" placeholder="在这里输入测试内容..." rows="3"></textarea>
+            <button onclick="testInput()">测试输入</button>
+        </div>
+
+        <div id="consoleOutput">
+            <strong>控制台输出:</strong><br>
+        </div>
+    </div>
+
+    <script>
+        // API配置
+        const API_CONFIG = {
+            visitor: {
+                url: 'http://dify.ai-role.cn/v1',
+                key: 'app-ntJ0qX9eMENmHw8MVLaEue0L'
+            },
+            supervisor: {
+                url: 'http://dify.ai-role.cn/v1',
+                key: 'app-ql5TGDmm625kINtn9Y8JefJE3'
+            }
+        };
+
+        // 控制台输出函数
+        function logToConsole(message) {
+            const output = document.getElementById('consoleOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            output.innerHTML += `<br>[${timestamp}] ${message}`;
+            output.scrollTop = output.scrollHeight;
+            console.log(message);
+        }
+
+        // 更新状态
+        function updateStatus(status) {
+            document.getElementById('status').textContent = `状态: ${status}`;
+            logToConsole(status);
+        }
+
+        // 检查DOM元素
+        function checkElements() {
+            const testInput = document.getElementById('testInput');
+            const elementsStatus = document.getElementById('elementsStatus');
+
+            if (testInput) {
+                elementsStatus.textContent = 'DOM元素状态: 所有元素已找到 ✓';
+                logToConsole('输入框元素已找到，可以正常输入');
+
+                // 测试输入框事件
+                testInput.addEventListener('input', function() {
+                    logToConsole(`输入框内容变化: "${this.value}"`);
+                });
+
+                testInput.addEventListener('focus', function() {
+                    logToConsole('输入框获得焦点');
+                });
+
+                testInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        logToConsole('检测到回车键');
+                    }
+                });
+            } else {
+                elementsStatus.textContent = 'DOM元素状态: 输入框未找到 ✗';
+                logToConsole('错误: 输入框元素未找到');
+            }
+        }
+
+        // 测试API连接
+        async function testAPI() {
+            updateStatus('正在测试API连接...');
+
+            try {
+                const response = await fetch(API_CONFIG.visitor.url + '/chat-messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_CONFIG.visitor.key}`
+                    },
+                    body: JSON.stringify({
+                        inputs: {},
+                        query: '你好，这是测试消息',
+                        response_mode: 'blocking',
+                        conversation_id: '',
+                        user: 'test_user'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    logToConsole(`API连接成功: ${JSON.stringify(data)}`);
+                    updateStatus('API连接成功 ✓');
+                } else {
+                    const errorText = await response.text();
+                    logToConsole(`API连接失败: ${response.status} - ${errorText}`);
+                    updateStatus(`API连接失败: ${response.status}`);
+                }
+            } catch (error) {
+                logToConsole(`API调用错误: ${error.message}`);
+                updateStatus('API调用失败');
+            }
+        }
+
+        // 测试对话流程
+        async function testConversation() {
+            updateStatus('正在测试对话流程...');
+
+            try {
+                // 模拟调用来访者API
+                logToConsole('正在调用来访者API...');
+                const visitorResponse = await callVisitorAgent("你好");
+                logToConsole(`来访者回复: ${visitorResponse}`);
+
+                // 模拟调用督导API
+                logToConsole('正在调用督导API...');
+                const evaluation = await callSupervisorAgent("你好，很高兴认识你");
+                logToConsole(`督导评价: ${evaluation}`);
+
+                updateStatus('对话流程测试完成 ✓');
+            } catch (error) {
+                logToConsole(`对话流程测试失败: ${error.message}`);
+                updateStatus('对话流程测试失败');
+            }
+        }
+
+        // 调用来访者API（简化版）
+        async function callVisitorAgent(message) {
+            return "最近我感到有些困惑，不知道该如何处理工作和生活之间的平衡。总是觉得很累，但又不知道该向谁倾诉。";
+        }
+
+        // 调用督导API（简化版）
+        async function callSupervisorAgent(message) {
+            return JSON.stringify({
+                综合得分: 4,
+                总体评价: "这是一个友好的开场，体现了咨询师的亲和力。",
+                建议: "可以进一步探索来访者的具体需求，使用更具体的开放式问题。"
+            });
+        }
+
+        // 测试输入
+        function testInput() {
+            const input = document.getElementById('testInput').value;
+            logToConsole(`测试输入: "${input}"`);
+
+            if (input.trim()) {
+                updateStatus(`收到输入: "${input.substring(0, 20)}${input.length > 20 ? '...' : ''}"`);
+            } else {
+                updateStatus('输入为空');
+            }
+        }
+
+        // 清空控制台
+        function clearConsole() {
+            document.getElementById('consoleOutput').innerHTML = '<strong>控制台输出:</strong><br>';
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            logToConsole('页面加载完成');
+            updateStatus('页面加载完成');
+            checkElements();
+        });
+
+        // 确保页面完全加载
+        window.addEventListener('load', function() {
+            logToConsole('页面完全加载');
+            updateStatus('调试环境已就绪');
+        });
+    </script>
+</body>
+</html>

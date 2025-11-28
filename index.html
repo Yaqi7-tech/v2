@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心理咨询模拟系统</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>心理咨询模拟系统</h1>
+            <div class="status" id="status">准备就绪</div>
+        </header>
+
+        <div class="main-content">
+            <!-- 对话区域 -->
+            <div class="conversation-panel">
+                <div class="panel-header">
+                    <h2>对话</h2>
+                    <div class="panel-controls">
+                        <button class="control-btn" onclick="toggleConversationHistory()" id="historyToggleBtn">
+                            📜 对话历史
+                        </button>
+                        <button class="control-btn" onclick="clearCurrentConversation()" id="clearBtn">
+                            🗑️ 清空对话
+                        </button>
+                    </div>
+                </div>
+                <div class="chat-container" id="chatContainer">
+                    <div class="welcome-message">
+                        欢迎使用心理咨询模拟系统。点击"开始新的对话"来开始练习。
+                    </div>
+                </div>
+
+                <!-- 对话历史容器 -->
+                <div class="conversation-history" id="conversationHistory" style="display: none;">
+                    <h3>对话历史记录</h3>
+                    <div class="history-controls">
+                        <button class="control-btn" onclick="exportConversationHistory()">
+                            📥 导出对话
+                        </button>
+                        <button class="control-btn" onclick="clearConversationHistory()">
+                            🗑️ 清空历史
+                        </button>
+                    </div>
+                    <div id="conversationHistoryList">
+                        <!-- 历史对话记录将在这里显示 -->
+                    </div>
+                </div>
+
+                <div class="input-area">
+                    <textarea id="userInput" placeholder="请输入你的回复..." rows="3" disabled></textarea>
+                    <div class="button-group">
+                        <button id="startBtn" onclick="startNewConversation()">开始新的对话</button>
+                        <button id="sendBtn" onclick="sendMessage()" disabled>发送</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 督导评价区域 -->
+            <div class="supervision-panel">
+                <h2>督导评价</h2>
+                <div class="evaluation-container" id="evaluationContainer">
+                    <div class="no-evaluation">
+                        暂无评价信息。开始对话后，督导会对你的回复进行评价。
+                    </div>
+                </div>
+
+                <div class="evaluation-history" id="evaluationHistory">
+                    <h3>历史评价</h3>
+                    <div id="historyList">
+                        <!-- 历史评价将在这里显示 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
