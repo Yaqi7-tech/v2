@@ -115,16 +115,54 @@ async function callSupervisorAgent(message) {
         console.log('保存督导会话ID:', response.conversation_id);
     }
 
+    console.log('督导Agent原始响应:', response);
+    console.log('督导响应answer内容:', response.answer);
+
     // 尝试解析JSON格式的评价
     try {
-        const evaluationData = JSON.parse(response.answer);
-        return evaluationData;
+        // 先清理可能的格式问题
+        let cleanAnswer = response.answer.trim();
+
+        // 检查是否可能是JSON格式
+        if (cleanAnswer.startsWith('{') && cleanAnswer.endsWith('}')) {
+            console.log('检测到JSON格式，尝试解析...');
+            const evaluationData = JSON.parse(cleanAnswer);
+            console.log('督导评价解析成功:', evaluationData);
+
+            // 确保必要字段存在
+            if (!evaluationData.综合得分) evaluationData.综合得分 = 3;
+            if (!evaluationData.总体评价) evaluationData.总体评价 = '暂无评价';
+            if (!evaluationData.建议) evaluationData.建议 = '请继续关注来访者的需求和感受。';
+
+            return evaluationData;
+        } else {
+            console.log('非JSON格式，创建默认评价结构');
+            // 如果不是JSON格式，创建包含跳步判断的基本结构
+            return {
+                综合得分: 3,
+                总体评价: cleanAnswer,
+                建议: "请继续关注来访者的需求和感受。",
+                跳步判断: {
+                    是否跳步: false,
+                    跳步类型: "无",
+                    督导建议: "当前回复符合基本要求"
+                }
+            };
+        }
     } catch (error) {
+        console.error('督导评价解析失败:', error);
+        console.error('原始answer内容:', response.answer);
+
         // 如果解析失败，返回默认格式的评价
         return {
             综合得分: 3,
             总体评价: response.answer,
-            建议: "请继续关注来访者的需求和感受。"
+            建议: "请继续关注来访者的需求和感受。",
+            跳步判断: {
+                是否跳步: false,
+                跳步类型: "解析错误",
+                督导建议: "评价格式解析出现问题，请检查API响应"
+            }
         };
     }
 }
