@@ -122,19 +122,62 @@ async function callSupervisorAgent(message) {
     try {
         // 先清理可能的格式问题
         let cleanAnswer = response.answer.trim();
+        console.log('清理后的answer:', cleanAnswer);
+        console.log('answer长度:', cleanAnswer.length);
+        console.log('answer前10字符:', cleanAnswer.substring(0, 10));
+        console.log('answer后10字符:', cleanAnswer.substring(Math.max(0, cleanAnswer.length - 10)));
 
-        // 检查是否可能是JSON格式
-        if (cleanAnswer.startsWith('{') && cleanAnswer.endsWith('}')) {
-            console.log('检测到JSON格式，尝试解析...');
-            const evaluationData = JSON.parse(cleanAnswer);
-            console.log('督导评价解析成功:', evaluationData);
+        // 检查是否可能是JSON格式 - 更宽松的检测
+        const hasJsonStructure =
+            (cleanAnswer.includes('{') && cleanAnswer.includes('}')) ||
+            (cleanAnswer.includes('"综合得分"') && cleanAnswer.includes('"总体评价"')) ||
+            (cleanAnswer.includes('"跳步判断"'));
 
-            // 确保必要字段存在
-            if (!evaluationData.综合得分) evaluationData.综合得分 = 3;
-            if (!evaluationData.总体评价) evaluationData.总体评价 = '暂无评价';
-            if (!evaluationData.建议) evaluationData.建议 = '请继续关注来访者的需求和感受。';
+        if (hasJsonStructure) {
+            console.log('检测到可能的JSON格式，尝试解析...');
 
-            return evaluationData;
+            // 尝试多种JSON解析方法
+            let evaluationData = null;
+            try {
+                evaluationData = JSON.parse(cleanAnswer);
+                console.log('JSON.parse成功，督导评价:', evaluationData);
+            } catch (parseError) {
+                console.log('JSON.parse失败:', parseError.message);
+
+                // 尝试清理并重新解析
+                try {
+                    // 移除可能的格式问题字符
+                    const cleanedJson = cleanAnswer
+                        .replace(/[\u0000-\u001F\u200B-\u200D\u202A-\u202E\u2060-\u206F\uFEFF]/g, '') // 移除零宽字符
+                        .replace(/\\n/g, '\\\\n') // 转义换行符
+                        .replace(/\\"/g, '"') // 修复引号问题
+                        .replace(/""/g, '""') // 修复双引号问题
+                        .trim();
+
+                    console.log('清理后的JSON:', cleanedJson);
+                    evaluationData = JSON.parse(cleanedJson);
+                    console.log('清理后JSON.parse成功:', evaluationData);
+                } catch (secondParseError) {
+                    console.log('第二次JSON.parse也失败:', secondParseError.message);
+                    throw secondParseError;
+                }
+            }
+
+            if (evaluationData) {
+                // 确保必要字段存在
+                if (!evaluationData.综合得分) evaluationData.综合得分 = 3;
+                if (!evaluationData.总体评价) evaluationData.总体评价 = '暂无评价';
+                if (!evaluationData.建议) evaluationData.建议 = '请继续关注来访者的需求和感受。';
+                if (!evaluationData.跳步判断) evaluationData.跳步判断 = {
+                    是否跳步: false,
+                    跳步类型: "无",
+                    督导建议: "无跳步问题"
+                };
+
+                return evaluationData;
+            } else {
+                throw new Error('无法解析JSON格式');
+            }
         } else {
             console.log('非JSON格式，创建默认评价结构');
             // 如果不是JSON格式，创建包含跳步判断的基本结构
