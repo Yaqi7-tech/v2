@@ -508,6 +508,7 @@ async function sendMessage() {
 // 初始化函数
 function initializeApp() {
     console.log('开始初始化应用...');
+    console.log('检查Chart.js状态:', window.Chart ? '已加载' : '未加载');
 
     // 检查DOM元素是否存在
     if (!elements.chatContainer) {
