@@ -122,28 +122,47 @@ async function callVisitorAgent(message) {
         if (jsonText) {
             console.log('提取到来访者数据JSON:', jsonText);
             
-            // 尝试清理JSON中的潜在错误（如尾部逗号）
+            // 尝试清理JSON中的潜在错误
             let cleanJsonText = jsonText
                 // 移除数组中最后一个元素后的逗号
                 .replace(/,(\s*])/g, '$1')
                 // 移除对象中最后一个属性后的逗号
                 .replace(/,(\s*})/g, '$1')
-                // 移除不可见字符
-                .replace(/[\u0000-\u001F\u200B-\u200D\u202A-\u202E\u2060-\u206F\uFEFF]/g, '');
+                // 移除不可见字符 (保留换行符，但在JSON字符串中换行符需要转义)
+                // 这里只移除除了换行符之外的控制字符
+                .replace(/[\u0000-\u0009\u000B-\u001F\u200B-\u200D\u202A-\u202E\u2060-\u206F\uFEFF]/g, '');
                 
             console.log('清理后的JSON:', cleanJsonText);
             
-            const chartData = JSON.parse(cleanJsonText);
-            
-            // 更新图表数据
-            updateChartsData(chartData);
-            
-            // 从响应中移除JSON部分，只保留对话文本
-            // 使用原始提取的文本进行替换，确保匹配成功
-            visitorText = response.answer.replace(jsonText, '').trim();
+            let chartData = null;
+            try {
+                chartData = JSON.parse(cleanJsonText);
+            } catch (parseError) {
+                console.warn('标准JSON解析失败，尝试修复:', parseError);
+                // 尝试进一步修复
+                try {
+                    // 1. 尝试将换行符替换为空格
+                    // 这样既处理了字符串中的非法换行，也保留了JSON结构（空格是合法空白符）
+                    const fixedJson = cleanJsonText.replace(/\n/g, ' ');
+                    chartData = JSON.parse(fixedJson);
+                    console.log('替换换行符为空格后解析成功');
+                } catch (retryError) {
+                    console.error('JSON修复失败:', retryError);
+                    updateStatus('数据解析异常，图表可能未更新', 'error');
+                }
+            }
+
+            if (chartData) {
+                // 更新图表数据
+                updateChartsData(chartData);
+                
+                // 从响应中移除JSON部分，只保留对话文本
+                // 使用原始提取的文本进行替换，确保匹配成功
+                visitorText = response.answer.replace(jsonText, '').trim();
+            }
         }
     } catch (e) {
-        console.warn('解析来访者数据JSON失败:', e);
+        console.warn('处理来访者数据失败:', e);
         // 失败则忽略数据更新，只显示原始文本
     }
 
