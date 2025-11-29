@@ -121,14 +121,23 @@ async function callVisitorAgent(message) {
         const jsonText = extractJsonObjectFromText(response.answer);
         if (jsonText) {
             console.log('提取到来访者数据JSON:', jsonText);
-            const chartData = JSON.parse(jsonText);
+            
+            // 尝试清理JSON中的潜在错误（如尾部逗号）
+            let cleanJsonText = jsonText
+                // 移除数组中最后一个元素后的逗号
+                .replace(/,(\s*])/g, '$1')
+                // 移除对象中最后一个属性后的逗号
+                .replace(/,(\s*})/g, '$1');
+                
+            console.log('清理后的JSON:', cleanJsonText);
+            
+            const chartData = JSON.parse(cleanJsonText);
             
             // 更新图表数据
             updateChartsData(chartData);
             
             // 从响应中移除JSON部分，只保留对话文本
-            // 简单的替换可能不准确，如果JSON在中间或开头。这里假设JSON在末尾或独立块。
-            // 更安全的做法是替换提取到的jsonText
+            // 使用原始提取的文本进行替换，确保匹配成功
             visitorText = response.answer.replace(jsonText, '').trim();
         }
     } catch (e) {
@@ -869,9 +878,14 @@ function extractJsonObjectFromText(text) {
                     if (depth === 0) {
                         const candidate = text.slice(startIndex, i + 1);
                         // 验证是否包含关键字段，避免提取到其他无关的括号内容
+                        // 兼容督导评价和来访者数据
                         if (candidate.includes('"综合得分"') || 
                             candidate.includes('"总体评价"') || 
-                            candidate.includes('"跳步判断"')) {
+                            candidate.includes('"跳步判断"') ||
+                            candidate.includes('"conversation_stage_curve"') ||
+                            candidate.includes('"session_emotion_timeline"') ||
+                            candidate.includes('"stress_curve"') ||
+                            candidate.includes('"emotion_curve"')) {
                             return candidate;
                         }
                         matches.push(candidate);
