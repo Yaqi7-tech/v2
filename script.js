@@ -25,7 +25,15 @@ let appState = {
     supervisorConversationId: null, // 督导会话ID
     usingSimulation: false, // 是否在使用模拟数据
     conversationSessions: [], // 对话会话历史
-    currentSessionId: null // 当前会话ID
+    currentSessionId: null, // 当前会话ID
+    // 图表数据
+    chartsData: {
+        stage: [],
+        emotionTimeline: [],
+        stress: [],
+        emotionIntensity: []
+    },
+    charts: {} // Chart.js 实例
 };
 
 // DOM元素
@@ -40,7 +48,12 @@ const elements = {
     conversationHistory: document.getElementById('conversationHistory'),
     conversationHistoryList: document.getElementById('conversationHistoryList'),
     historyToggleBtn: document.getElementById('historyToggleBtn'),
-    clearBtn: document.getElementById('clearBtn')
+    clearBtn: document.getElementById('clearBtn'),
+    // 图表Canvas元素
+    stageChart: document.getElementById('stageChart'),
+    emotionTimelineChart: document.getElementById('emotionTimelineChart'),
+    stressChart: document.getElementById('stressChart'),
+    emotionIntensityChart: document.getElementById('emotionIntensityChart')
 };
 
 // 调用Dify API
@@ -102,7 +115,28 @@ async function callVisitorAgent(message) {
         console.log('保存来访者会话ID:', response.conversation_id);
     }
 
-    return response.answer;
+    // 解析响应：分离文本和JSON数据
+    let visitorText = response.answer;
+    try {
+        const jsonText = extractJsonObjectFromText(response.answer);
+        if (jsonText) {
+            console.log('提取到来访者数据JSON:', jsonText);
+            const chartData = JSON.parse(jsonText);
+            
+            // 更新图表数据
+            updateChartsData(chartData);
+            
+            // 从响应中移除JSON部分，只保留对话文本
+            // 简单的替换可能不准确，如果JSON在中间或开头。这里假设JSON在末尾或独立块。
+            // 更安全的做法是替换提取到的jsonText
+            visitorText = response.answer.replace(jsonText, '').trim();
+        }
+    } catch (e) {
+        console.warn('解析来访者数据JSON失败:', e);
+        // 失败则忽略数据更新，只显示原始文本
+    }
+
+    return visitorText;
 }
 
 // 督导Agent调用
@@ -389,6 +423,9 @@ async function startNewConversation() {
 
         appState.conversationHistory = [];
         appState.evaluationHistory = [];
+        
+        // 重置图表
+        resetCharts();
 
         // 显示系统消息
         displayMessage('系统', `对话 #${appState.conversationSessions.indexOf(newSession) + 1} 已开始，来访者正在进入...`, 'system');
@@ -484,6 +521,9 @@ function initializeApp() {
 
     // 初始化界面
     updateStatus('准备就绪');
+    
+    // 初始化图表
+    initCharts();
 
     // 隐藏对话历史面板
     if (elements.conversationHistory) {
@@ -711,6 +751,9 @@ function clearCurrentConversation() {
             暂无评价信息。开始对话后，督导会对你的回复进行评价。
         </div>
     `;
+    
+    // 重置图表
+    resetCharts();
 
     updateEvaluationHistory();
 
@@ -883,6 +926,227 @@ function formatDateTime(date) {
     const d = new Date(date);
     const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
     return `${d.getFullYear()}年${months[d.getMonth()]}${d.getDate()}日 ${formatTime(d)}`;
+}
+
+// ========== 图表功能 ==========
+
+// 初始化图表
+function initCharts() {
+    if (!elements.stageChart || !window.Chart) return;
+
+    // 通用配置
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            x: {
+                title: {
+                    display: true,
+                    text: '对话轮次'
+                },
+                ticks: {
+                    stepSize: 1
+                }
+            }
+        }
+    };
+
+    // 1. 对话阶段曲线
+    appState.charts.stage = new Chart(elements.stageChart, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '阶段 (1-4)',
+                data: [],
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                stepped: true, // 阶梯线
+                tension: 0
+            }]
+        },
+        options: {
+            ...commonOptions,
+            scales: {
+                ...commonOptions.scales,
+                y: {
+                    min: 0,
+                    max: 5,
+                    ticks: {
+                        stepSize: 1
+                    },
+                    title: { display: true, text: '阶段' }
+                }
+            }
+        }
+    });
+
+    // 2. 情绪波动 (Timeline) - 使用散点图模拟或简单的点图
+    // 由于是文本标签，我们用y轴固定值，在点上显示标签
+    appState.charts.emotionTimeline = new Chart(elements.emotionTimelineChart, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '情绪状态',
+                data: [], // y值都设为1
+                borderColor: '#9b59b6',
+                backgroundColor: 'rgba(155, 89, 182, 0.2)',
+                pointRadius: 6,
+                pointHoverRadius: 8
+            }]
+        },
+        options: {
+            ...commonOptions,
+            scales: {
+                ...commonOptions.scales,
+                y: {
+                    display: false, // 隐藏Y轴
+                    min: 0,
+                    max: 2
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return '情绪: ' + context.raw.emotionLabel;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // 3. 压力曲线
+    appState.charts.stress = new Chart(elements.stressChart, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '压力值 (0-1)',
+                data: [],
+                borderColor: '#e74c3c',
+                backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            ...commonOptions,
+            scales: {
+                ...commonOptions.scales,
+                y: {
+                    min: 0,
+                    max: 1,
+                    title: { display: true, text: '压力值' }
+                }
+            }
+        }
+    });
+
+    // 4. 情绪强度曲线
+    appState.charts.emotionIntensity = new Chart(elements.emotionIntensityChart, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '情绪效价 (-1 ~ 1)',
+                data: [],
+                borderColor: '#f1c40f',
+                backgroundColor: 'rgba(241, 196, 15, 0.2)',
+                tension: 0.3,
+                fill: false
+            }]
+        },
+        options: {
+            ...commonOptions,
+            scales: {
+                ...commonOptions.scales,
+                y: {
+                    min: -1,
+                    max: 1,
+                    title: { display: true, text: '负面 <-> 正面' }
+                }
+            }
+        }
+    });
+}
+
+// 更新图表数据
+function updateChartsData(data) {
+    if (!data) return;
+    
+    // 解析数据
+    // 假设API返回的是完整的历史数组，我们直接替换
+    // 如果是增量，则需要判断。根据用户描述，似乎是返回数组。
+    // 我们取数组长度作为轮次
+    
+    // 1. 对话阶段
+    if (data.conversation_stage_curve && Array.isArray(data.conversation_stage_curve)) {
+        const points = data.conversation_stage_curve;
+        appState.chartsData.stage = points.map((p, i) => ({ x: i + 1, y: p.stage }));
+        
+        if (appState.charts.stage) {
+            appState.charts.stage.data.labels = points.map((_, i) => `第${i+1}轮`);
+            appState.charts.stage.data.datasets[0].data = appState.chartsData.stage;
+            appState.charts.stage.update();
+        }
+    }
+
+    // 2. 情绪波动 (Timeline)
+    if (data.session_emotion_timeline && Array.isArray(data.session_emotion_timeline)) {
+        const points = data.session_emotion_timeline;
+        // 映射为点，y=1，存储label
+        appState.chartsData.emotionTimeline = points.map((p, i) => ({
+            x: i + 1,
+            y: 1,
+            emotionLabel: p.label
+        }));
+
+        if (appState.charts.emotionTimeline) {
+            appState.charts.emotionTimeline.data.labels = points.map((_, i) => `第${i+1}轮`);
+            appState.charts.emotionTimeline.data.datasets[0].data = appState.chartsData.emotionTimeline;
+            appState.charts.emotionTimeline.update();
+        }
+    }
+
+    // 3. 压力曲线
+    if (data.stress_curve && Array.isArray(data.stress_curve)) {
+        const points = data.stress_curve;
+        appState.chartsData.stress = points.map((p, i) => ({ x: i + 1, y: p.value }));
+        
+        if (appState.charts.stress) {
+            appState.charts.stress.data.labels = points.map((_, i) => `第${i+1}轮`);
+            appState.charts.stress.data.datasets[0].data = appState.chartsData.stress;
+            appState.charts.stress.update();
+        }
+    }
+
+    // 4. 情绪强度
+    if (data.emotion_curve && Array.isArray(data.emotion_curve)) {
+        const points = data.emotion_curve;
+        appState.chartsData.emotionIntensity = points.map((p, i) => ({ x: i + 1, y: p.value }));
+        
+        if (appState.charts.emotionIntensity) {
+            appState.charts.emotionIntensity.data.labels = points.map((_, i) => `第${i+1}轮`);
+            appState.charts.emotionIntensity.data.datasets[0].data = appState.chartsData.emotionIntensity;
+            appState.charts.emotionIntensity.update();
+        }
+    }
+}
+
+// 重置图表
+function resetCharts() {
+    if (appState.charts.stage) {
+        ['stage', 'emotionTimeline', 'stress', 'emotionIntensity'].forEach(key => {
+            if (appState.charts[key]) {
+                appState.charts[key].data.labels = [];
+                appState.charts[key].data.datasets[0].data = [];
+                appState.charts[key].update();
+            }
+        });
+    }
 }
 
 // 保存对话会话到本地存储
