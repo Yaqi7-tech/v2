@@ -127,7 +127,9 @@ async function callVisitorAgent(message) {
                 // 移除数组中最后一个元素后的逗号
                 .replace(/,(\s*])/g, '$1')
                 // 移除对象中最后一个属性后的逗号
-                .replace(/,(\s*})/g, '$1');
+                .replace(/,(\s*})/g, '$1')
+                // 移除不可见字符
+                .replace(/[\u0000-\u001F\u200B-\u200D\u202A-\u202E\u2060-\u206F\uFEFF]/g, '');
                 
             console.log('清理后的JSON:', cleanJsonText);
             
@@ -878,17 +880,34 @@ function extractJsonObjectFromText(text) {
                     // 找到一个完整的JSON对象
                     if (depth === 0) {
                         const candidate = text.slice(startIndex, i + 1);
-                        // 验证是否包含关键字段，避免提取到其他无关的括号内容
-                        // 兼容督导评价和来访者数据
-                        if (candidate.includes('"综合得分"') || 
-                            candidate.includes('"总体评价"') || 
-                            candidate.includes('"跳步判断"') ||
-                            candidate.includes('"conversation_stage_curve"') ||
-                            candidate.includes('"session_emotion_timeline"') ||
-                            candidate.includes('"stress_curve"') ||
-                            candidate.includes('"emotion_curve"')) {
-                            return candidate;
+                        
+                        // 验证是否包含关键字段
+                        const hasKeywords = candidate.includes('"综合得分"') || 
+                                          candidate.includes('"总体评价"') || 
+                                          candidate.includes('"跳步判断"') ||
+                                          candidate.includes('"conversation_stage_curve"') ||
+                                          candidate.includes('"session_emotion_timeline"') ||
+                                          candidate.includes('"stress_curve"') ||
+                                          candidate.includes('"emotion_curve"');
+
+                        if (hasKeywords) {
+                            // 尝试验证是否为有效JSON
+                            try {
+                                // 预清理
+                                const cleanCandidate = candidate
+                                    .replace(/,(\s*])/g, '$1')
+                                    .replace(/,(\s*})/g, '$1')
+                                    .replace(/[\u0000-\u001F\u200B-\u200D\u202A-\u202E\u2060-\u206F\uFEFF]/g, ''); // 移除不可见字符
+                                
+                                JSON.parse(cleanCandidate);
+                                // 如果能解析成功，这很可能是我们要找的JSON
+                                // 返回原始candidate以便后续replace使用
+                                return candidate;
+                            } catch (e) {
+                                console.log('找到包含关键字的JSON块，但解析失败，继续搜索:', e.message);
+                            }
                         }
+                        
                         matches.push(candidate);
                         break; // 继续查找下一个可能的开始位置
                     }
@@ -900,8 +919,13 @@ function extractJsonObjectFromText(text) {
         startIndex = text.indexOf('{', startIndex + 1);
     }
     
-    // 如果没有找到包含关键字段的JSON，返回最后一个提取到的完整对象（备选方案）
-    return matches.length > 0 ? matches[matches.length - 1] : null;
+    // 如果没有找到完美匹配，尝试返回最后一个包含关键字的匹配项（即使解析失败也返回，交给调用者处理）
+    // 或者返回最后一个匹配项
+    const keywordMatches = matches.filter(m => 
+        m.includes('"综合得分"') || m.includes('"conversation_stage_curve"')
+    );
+    
+    return keywordMatches.length > 0 ? keywordMatches[keywordMatches.length - 1] : (matches.length > 0 ? matches[matches.length - 1] : null);
 }
 
 // 计算平均得分
