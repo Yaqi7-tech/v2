@@ -1024,7 +1024,10 @@ function initCharts() {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return '情绪: ' + context.raw.emotionLabel;
+                            const dataset = context.dataset;
+                            const index = context.dataIndex;
+                            const label = dataset.emotionLabels ? dataset.emotionLabels[index] : '';
+                            return '情绪: ' + label;
                         }
                     }
                 }
@@ -1099,9 +1102,12 @@ function updateChartsData(data) {
     // 1. 对话阶段
     if (data.conversation_stage_curve && Array.isArray(data.conversation_stage_curve)) {
         const points = data.conversation_stage_curve;
-        appState.chartsData.stage = points.map((p, i) => ({ x: i + 1, y: p.stage }));
+        // 更新全局数据状态，保留历史数据
+        // Chart.js 使用 category 轴时，data 应该是数值数组
+        appState.chartsData.stage = points.map(p => p.stage);
         
         if (appState.charts.stage) {
+            console.log('更新对话阶段图表数据:', appState.chartsData.stage);
             appState.charts.stage.data.labels = points.map((_, i) => `第${i+1}轮`);
             appState.charts.stage.data.datasets[0].data = appState.chartsData.stage;
             appState.charts.stage.update();
@@ -1112,15 +1118,17 @@ function updateChartsData(data) {
     if (data.session_emotion_timeline && Array.isArray(data.session_emotion_timeline)) {
         const points = data.session_emotion_timeline;
         // 映射为点，y=1，存储label
-        appState.chartsData.emotionTimeline = points.map((p, i) => ({
-            x: i + 1,
-            y: 1,
-            emotionLabel: p.label
-        }));
+        // 对于情绪Timeline，我们需要在tooltip中显示文本，这里y固定为1
+        appState.chartsData.emotionTimeline = points.map(p => 1);
+        const emotionLabels = points.map(p => p.label);
 
         if (appState.charts.emotionTimeline) {
+            console.log('更新情绪波动图表数据:', appState.chartsData.emotionTimeline);
             appState.charts.emotionTimeline.data.labels = points.map((_, i) => `第${i+1}轮`);
             appState.charts.emotionTimeline.data.datasets[0].data = appState.chartsData.emotionTimeline;
+            // 将自定义label存储在dataset中以便tooltip调用，或者直接存入point数据中
+            // 由于Chart.js dataset可以存储额外数据，我们放在chart实例的一个自定义属性上或者dataset中
+            appState.charts.emotionTimeline.data.datasets[0].emotionLabels = emotionLabels;
             appState.charts.emotionTimeline.update();
         }
     }
@@ -1128,9 +1136,10 @@ function updateChartsData(data) {
     // 3. 压力曲线
     if (data.stress_curve && Array.isArray(data.stress_curve)) {
         const points = data.stress_curve;
-        appState.chartsData.stress = points.map((p, i) => ({ x: i + 1, y: p.value }));
+        appState.chartsData.stress = points.map(p => p.value);
         
         if (appState.charts.stress) {
+            console.log('更新压力曲线图表数据:', appState.chartsData.stress);
             appState.charts.stress.data.labels = points.map((_, i) => `第${i+1}轮`);
             appState.charts.stress.data.datasets[0].data = appState.chartsData.stress;
             appState.charts.stress.update();
@@ -1140,9 +1149,10 @@ function updateChartsData(data) {
     // 4. 情绪强度
     if (data.emotion_curve && Array.isArray(data.emotion_curve)) {
         const points = data.emotion_curve;
-        appState.chartsData.emotionIntensity = points.map((p, i) => ({ x: i + 1, y: p.value }));
+        appState.chartsData.emotionIntensity = points.map(p => p.value);
         
         if (appState.charts.emotionIntensity) {
+            console.log('更新情绪强度图表数据:', appState.chartsData.emotionIntensity);
             appState.charts.emotionIntensity.data.labels = points.map((_, i) => `第${i+1}轮`);
             appState.charts.emotionIntensity.data.datasets[0].data = appState.chartsData.emotionIntensity;
             appState.charts.emotionIntensity.update();
