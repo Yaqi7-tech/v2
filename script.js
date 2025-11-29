@@ -745,6 +745,11 @@ function clearConversationHistory() {
 
 // 导出对话历史
 function exportConversationHistory() {
+    // 导出前确保当前会话数据是最新的
+    if (appState.currentSessionId && appState.conversationStarted) {
+        saveCurrentSession();
+    }
+
     if (appState.conversationSessions.length === 0) {
         alert('暂无对话历史记录可导出');
         return;
@@ -879,3 +884,10 @@ function loadConversationSessionsFromStorage() {
         console.warn('无法从本地存储加载对话历史:', error);
     }
 }
+
+// 监听页面关闭/刷新，保存当前进度
+window.addEventListener('beforeunload', () => {
+    if (appState.currentSessionId && appState.conversationStarted) {
+        saveCurrentSession();
+    }
+});
