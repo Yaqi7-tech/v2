@@ -788,25 +788,62 @@ function exportConversationHistory() {
 
 function extractJsonObjectFromText(text) {
     if (!text) return null;
-    const start = text.indexOf('{');
-    if (start === -1) return null;
-    let depth = 0;
-    let inString = false;
-    let escape = false;
-    for (let i = start; i < text.length; i++) {
-        const ch = text[i];
-        if (escape) { escape = false; continue; }
-        if (ch === '\\') { escape = true; continue; }
-        if (ch === '"') { inString = !inString; }
-        if (!inString) {
-            if (ch === '{') depth++;
-            else if (ch === '}') {
-                depth--;
-                if (depth === 0) return text.slice(start, i + 1);
+    
+    // 找到所有可能的JSON开始位置
+    const matches = [];
+    let startIndex = text.indexOf('{');
+    
+    while (startIndex !== -1) {
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+        
+        for (let i = startIndex; i < text.length; i++) {
+            const ch = text[i];
+            
+            // 处理转义字符
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            
+            if (ch === '\\') {
+                escape = true;
+                continue;
+            }
+            
+            // 处理字符串
+            if (ch === '"') {
+                inString = !inString;
+            }
+            
+            if (!inString) {
+                if (ch === '{') {
+                    depth++;
+                } else if (ch === '}') {
+                    depth--;
+                    // 找到一个完整的JSON对象
+                    if (depth === 0) {
+                        const candidate = text.slice(startIndex, i + 1);
+                        // 验证是否包含关键字段，避免提取到其他无关的括号内容
+                        if (candidate.includes('"综合得分"') || 
+                            candidate.includes('"总体评价"') || 
+                            candidate.includes('"跳步判断"')) {
+                            return candidate;
+                        }
+                        matches.push(candidate);
+                        break; // 继续查找下一个可能的开始位置
+                    }
+                }
             }
         }
+        
+        // 查找下一个可能的开始位置
+        startIndex = text.indexOf('{', startIndex + 1);
     }
-    return null;
+    
+    // 如果没有找到包含关键字段的JSON，返回最后一个提取到的完整对象（备选方案）
+    return matches.length > 0 ? matches[matches.length - 1] : null;
 }
 
 // 计算平均得分
