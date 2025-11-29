@@ -946,12 +946,42 @@ function formatDateTime(date) {
 
 // 初始化图表
 function initCharts() {
-    if (!elements.stageChart || !window.Chart) return;
+    console.log('尝试初始化图表...');
+    
+    // 重新获取Canvas元素，防止初始化时DOM未绪
+    elements.stageChart = document.getElementById('stageChart');
+    elements.emotionTimelineChart = document.getElementById('emotionTimelineChart');
+    elements.stressChart = document.getElementById('stressChart');
+    elements.emotionIntensityChart = document.getElementById('emotionIntensityChart');
+
+    if (!elements.stageChart) {
+        console.error('错误: 找不到图表Canvas元素 (stageChart)');
+        return;
+    }
+    
+    if (!window.Chart) {
+        console.error('错误: Chart.js 未加载');
+        updateStatus('图表组件加载失败，请刷新页面', 'error');
+        return;
+    }
+    
+    console.log('Chart.js 已加载，Canvas元素已找到，开始创建实例');
+
+    // 销毁旧实例（如果有）
+    ['stage', 'emotionTimeline', 'stress', 'emotionIntensity'].forEach(key => {
+        if (appState.charts[key]) {
+            appState.charts[key].destroy();
+            appState.charts[key] = null;
+        }
+    });
 
     // 通用配置
     const commonOptions = {
         responsive: true,
         maintainAspectRatio: false,
+        animation: {
+            duration: 1000 // 动画持续时间
+        },
         scales: {
             x: {
                 title: {
@@ -965,144 +995,160 @@ function initCharts() {
         }
     };
 
-    // 1. 对话阶段曲线
-    appState.charts.stage = new Chart(elements.stageChart, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: '阶段 (1-4)',
-                data: [],
-                borderColor: '#3498db',
-                backgroundColor: 'rgba(52, 152, 219, 0.2)',
-                stepped: true, // 阶梯线
-                tension: 0
-            }]
-        },
-        options: {
-            ...commonOptions,
-            scales: {
-                ...commonOptions.scales,
-                y: {
-                    min: 0,
-                    max: 5,
-                    ticks: {
-                        stepSize: 1
-                    },
-                    title: { display: true, text: '阶段' }
+    try {
+        // 1. 对话阶段曲线
+        appState.charts.stage = new Chart(elements.stageChart, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '阶段 (1-4)',
+                    data: [],
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                    stepped: true, // 阶梯线
+                    tension: 0
+                }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    ...commonOptions.scales,
+                    y: {
+                        min: 0,
+                        max: 5,
+                        ticks: {
+                            stepSize: 1
+                        },
+                        title: { display: true, text: '阶段' }
+                    }
                 }
             }
-        }
-    });
+        });
+        console.log('对话阶段图表初始化成功');
 
-    // 2. 情绪波动 (Timeline) - 使用散点图模拟或简单的点图
-    // 由于是文本标签，我们用y轴固定值，在点上显示标签
-    appState.charts.emotionTimeline = new Chart(elements.emotionTimelineChart, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: '情绪状态',
-                data: [], // y值都设为1
-                borderColor: '#9b59b6',
-                backgroundColor: 'rgba(155, 89, 182, 0.2)',
-                pointRadius: 6,
-                pointHoverRadius: 8
-            }]
-        },
-        options: {
-            ...commonOptions,
-            scales: {
-                ...commonOptions.scales,
-                y: {
-                    display: false, // 隐藏Y轴
-                    min: 0,
-                    max: 2
-                }
+        // 2. 情绪波动 (Timeline)
+        appState.charts.emotionTimeline = new Chart(elements.emotionTimelineChart, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '情绪状态',
+                    data: [], 
+                    borderColor: '#9b59b6',
+                    backgroundColor: 'rgba(155, 89, 182, 0.2)',
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }]
             },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const dataset = context.dataset;
-                            const index = context.dataIndex;
-                            const label = dataset.emotionLabels ? dataset.emotionLabels[index] : '';
-                            return '情绪: ' + label;
+            options: {
+                ...commonOptions,
+                scales: {
+                    ...commonOptions.scales,
+                    y: {
+                        display: false, // 隐藏Y轴
+                        min: 0,
+                        max: 2
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const dataset = context.dataset;
+                                const index = context.dataIndex;
+                                const label = dataset.emotionLabels ? dataset.emotionLabels[index] : '';
+                                return '情绪: ' + label;
+                            }
                         }
                     }
                 }
             }
-        }
-    });
+        });
+        console.log('情绪波动图表初始化成功');
 
-    // 3. 压力曲线
-    appState.charts.stress = new Chart(elements.stressChart, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: '压力值 (0-1)',
-                data: [],
-                borderColor: '#e74c3c',
-                backgroundColor: 'rgba(231, 76, 60, 0.2)',
-                tension: 0.3,
-                fill: true
-            }]
-        },
-        options: {
-            ...commonOptions,
-            scales: {
-                ...commonOptions.scales,
-                y: {
-                    min: 0,
-                    max: 1,
-                    title: { display: true, text: '压力值' }
+        // 3. 压力曲线
+        appState.charts.stress = new Chart(elements.stressChart, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '压力值 (0-1)',
+                    data: [],
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    ...commonOptions.scales,
+                    y: {
+                        min: 0,
+                        max: 1,
+                        title: { display: true, text: '压力值' }
+                    }
                 }
             }
-        }
-    });
+        });
+        console.log('压力曲线图表初始化成功');
 
-    // 4. 情绪强度曲线
-    appState.charts.emotionIntensity = new Chart(elements.emotionIntensityChart, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: '情绪效价 (-1 ~ 1)',
-                data: [],
-                borderColor: '#f1c40f',
-                backgroundColor: 'rgba(241, 196, 15, 0.2)',
-                tension: 0.3,
-                fill: false
-            }]
-        },
-        options: {
-            ...commonOptions,
-            scales: {
-                ...commonOptions.scales,
-                y: {
-                    min: -1,
-                    max: 1,
-                    title: { display: true, text: '负面 <-> 正面' }
+        // 4. 情绪强度曲线
+        appState.charts.emotionIntensity = new Chart(elements.emotionIntensityChart, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '情绪效价 (-1 ~ 1)',
+                    data: [],
+                    borderColor: '#f1c40f',
+                    backgroundColor: 'rgba(241, 196, 15, 0.2)',
+                    tension: 0.3,
+                    fill: false
+                }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    ...commonOptions.scales,
+                    y: {
+                        min: -1,
+                        max: 1,
+                        title: { display: true, text: '负面 <-> 正面' }
+                    }
                 }
             }
-        }
-    });
+        });
+        console.log('情绪强度图表初始化成功');
+
+    } catch (error) {
+        console.error('图表初始化过程中发生错误:', error);
+    }
 }
 
 // 更新图表数据
 function updateChartsData(data) {
     if (!data) return;
     
-    // 解析数据
-    // 假设API返回的是完整的历史数组，我们直接替换
-    // 如果是增量，则需要判断。根据用户描述，似乎是返回数组。
-    // 我们取数组长度作为轮次
+    // 检查图表实例是否存在，如果缺失则尝试初始化
+    // 这种预先检查比在每个if块中检查更安全，避免部分初始化导致的数据不一致
+    if (!appState.charts.stage || !appState.charts.emotionTimeline || 
+        !appState.charts.stress || !appState.charts.emotionIntensity) {
+        console.warn('检测到部分图表实例缺失，尝试重新初始化所有图表');
+        initCharts();
+    }
     
+    // 再次检查，如果初始化失败则退出
+    if (!appState.charts.stage) {
+        console.error('图表初始化失败，无法更新数据');
+        return;
+    }
+
     // 1. 对话阶段
     if (data.conversation_stage_curve && Array.isArray(data.conversation_stage_curve)) {
         const points = data.conversation_stage_curve;
-        // 更新全局数据状态，保留历史数据
         // Chart.js 使用 category 轴时，data 应该是数值数组
         appState.chartsData.stage = points.map(p => p.stage);
         
@@ -1118,7 +1164,6 @@ function updateChartsData(data) {
     if (data.session_emotion_timeline && Array.isArray(data.session_emotion_timeline)) {
         const points = data.session_emotion_timeline;
         // 映射为点，y=1，存储label
-        // 对于情绪Timeline，我们需要在tooltip中显示文本，这里y固定为1
         appState.chartsData.emotionTimeline = points.map(p => 1);
         const emotionLabels = points.map(p => p.label);
 
@@ -1126,8 +1171,7 @@ function updateChartsData(data) {
             console.log('更新情绪波动图表数据:', appState.chartsData.emotionTimeline);
             appState.charts.emotionTimeline.data.labels = points.map((_, i) => `第${i+1}轮`);
             appState.charts.emotionTimeline.data.datasets[0].data = appState.chartsData.emotionTimeline;
-            // 将自定义label存储在dataset中以便tooltip调用，或者直接存入point数据中
-            // 由于Chart.js dataset可以存储额外数据，我们放在chart实例的一个自定义属性上或者dataset中
+            // 将自定义label存储在dataset中以便tooltip调用
             appState.charts.emotionTimeline.data.datasets[0].emotionLabels = emotionLabels;
             appState.charts.emotionTimeline.update();
         }
