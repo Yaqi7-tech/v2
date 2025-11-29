@@ -136,25 +136,19 @@ async function callSupervisorAgent(message) {
         if (hasJsonStructure) {
             console.log('检测到可能的JSON格式，尝试解析...');
 
-            // 尝试多种JSON解析方法
             let evaluationData = null;
             try {
                 evaluationData = JSON.parse(cleanAnswer);
                 console.log('JSON.parse成功，督导评价:', evaluationData);
             } catch (parseError) {
                 console.log('JSON.parse失败:', parseError.message);
-
-                // 尝试清理并重新解析
                 try {
-                    // 移除可能的格式问题字符
-                    const cleanedJson = cleanAnswer
-                        .replace(/[\u0000-\u001F\u200B-\u200D\u202A-\u202E\u2060-\u206F\uFEFF]/g, '') // 移除零宽字符
-                        .replace(/\\n/g, '\\\\n') // 转义换行符
-                        .replace(/\\"/g, '"') // 修复引号问题
-                        .replace(/""/g, '""') // 修复双引号问题
+                    const jsonText = extractJsonObjectFromText(cleanAnswer);
+                    if (!jsonText) throw new Error('未找到JSON对象');
+                    const cleanedJson = jsonText
+                        .replace(/[\u0000-\u001F\u200B-\u200D\u202A-\u202E\u2060-\u206F\uFEFF]/g, '')
                         .trim();
-
-                    console.log('清理后的JSON:', cleanedJson);
+                    console.log('提取到的JSON:', cleanedJson);
                     evaluationData = JSON.parse(cleanedJson);
                     console.log('清理后JSON.parse成功:', evaluationData);
                 } catch (secondParseError) {
@@ -786,6 +780,29 @@ function exportConversationHistory() {
 }
 
 // ========== 工具函数 ==========
+
+function extractJsonObjectFromText(text) {
+    if (!text) return null;
+    const start = text.indexOf('{');
+    if (start === -1) return null;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = start; i < text.length; i++) {
+        const ch = text[i];
+        if (escape) { escape = false; continue; }
+        if (ch === '\\') { escape = true; continue; }
+        if (ch === '"') { inString = !inString; }
+        if (!inString) {
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+                depth--;
+                if (depth === 0) return text.slice(start, i + 1);
+            }
+        }
+    }
+    return null;
+}
 
 // 计算平均得分
 function calculateAverageScore(evaluations) {
