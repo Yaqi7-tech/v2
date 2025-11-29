@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>心理咨询模拟系统</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="node_modules/chart.js/dist/chart.umd.js"></script>
 </head>
 <body>
     <div class="container">
@@ -72,6 +73,29 @@
                     <div id="historyList">
                         <!-- 历史评价将在这里显示 -->
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据监控区域 -->
+        <div class="monitor-panel">
+            <h2>来访者状态监控</h2>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h3>对话阶段</h3>
+                    <canvas id="stageChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>情绪波动 (Timeline)</h3>
+                    <canvas id="emotionTimelineChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>压力水平</h3>
+                    <canvas id="stressChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>情绪强度</h3>
+                    <canvas id="emotionIntensityChart"></canvas>
                 </div>
             </div>
         </div>
