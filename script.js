@@ -1040,13 +1040,27 @@ function initCharts() {
     };
 
     try {
+        // 阶段名称映射
+        const STAGE_NAMES = {
+            1: "建立关系",
+            2: "情绪/问题叙述",
+            3: "探索情绪与想法",
+            4: "洞察",
+            5: "深度处理",
+            6: "行动",
+            7: "抵抗 / 防御",
+            8: "冲突回避",
+            9: "反刍",
+            10: "突破前兆"
+        };
+
         // 1. 对话阶段曲线
         appState.charts.stage = new Chart(elements.stageChart, {
             type: 'line',
             data: {
                 labels: [],
                 datasets: [{
-                    label: '阶段 (1-4)',
+                    label: '阶段 (1-10)',
                     data: [],
                     borderColor: '#3498db',
                     backgroundColor: 'rgba(52, 152, 219, 0.2)',
@@ -1060,11 +1074,22 @@ function initCharts() {
                     ...commonOptions.scales,
                     y: {
                         min: 0,
-                        max: 5,
+                        max: 11,
                         ticks: {
                             stepSize: 1
                         },
                         title: { display: true, text: '阶段' }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                const stageName = STAGE_NAMES[value] || '未知阶段';
+                                return `阶段 ${value}: ${stageName}`;
+                            }
+                        }
                     }
                 }
             }
