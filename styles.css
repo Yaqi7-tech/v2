@@ -544,11 +544,50 @@ button:disabled {
     font-size: 12px;
 }
 
+.monitor-panel {
+    margin-top: 20px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    padding: 20px;
+}
+
+.monitor-panel h2 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #ecf0f1;
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.chart-container {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    height: 300px;
+}
+
+.chart-container h3 {
+    font-size: 16px;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
 /* 响应式设计优化 */
 @media (max-width: 768px) {
     .main-content {
         grid-template-columns: 1fr;
         height: auto;
+    }
+    
+    .charts-grid {
+        grid-template-columns: 1fr;
     }
 
     .panel-controls {
