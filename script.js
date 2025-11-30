@@ -299,6 +299,11 @@ function displayEvaluation(evaluation) {
     const skipStep = safeEvaluation.跳步判断 || {};
     const hasSkipStep = skipStep.是否跳步 || false;
 
+    // 清理Markdown符号
+    const cleanedOverallEvaluation = cleanMarkdownSymbols(safeEvaluation.总体评价 || '暂无评价');
+    const cleanedSuggestions = cleanMarkdownSymbols(safeEvaluation.建议 || '暂无建议');
+    const cleanedSupervisorAdvice = cleanMarkdownSymbols(skipStep.督导建议 || '暂无建议');
+
     // 更新当前评价显示
     elements.evaluationContainer.innerHTML = `
         <div class="evaluation">
@@ -309,13 +314,13 @@ function displayEvaluation(evaluation) {
             <div class="evaluation-content">
                 <div class="evaluation-section">
                     <strong>总体评价：</strong>
-                    <div class="evaluation-text">${safeEvaluation.总体评价 || '暂无评价'}</div>
+                    <div class="evaluation-text">${cleanedOverallEvaluation}</div>
                 </div>
             </div>
             <div class="evaluation-suggestions">
                 <div class="evaluation-section">
                     <strong>建议：</strong>
-                    <div class="evaluation-text">${safeEvaluation.建议 || '暂无建议'}</div>
+                    <div class="evaluation-text">${cleanedSuggestions}</div>
                 </div>
             </div>
             ${hasSkipStep ? `
@@ -324,7 +329,7 @@ function displayEvaluation(evaluation) {
                         <span class="warning-icon">⚠️</span>
                         <strong>跳步判断：${skipStep.跳步类型 || '未知类型'}</strong>
                     </div>
-                    <div class="skip-step-detail">${skipStep.督导建议 || '暂无建议'}</div>
+                    <div class="skip-step-detail">${cleanedSupervisorAdvice}</div>
                 </div>
             ` : `
                 <div class="skip-step-success">
@@ -358,6 +363,11 @@ function updateEvaluationHistory() {
         const hasSkipStep = skipStep.是否跳步 || false;
         const evalNumber = appState.evaluationHistory.length - index - 1;
 
+        // 清理Markdown符号
+        const cleanedOverallEvaluation = cleanMarkdownSymbols(eval.总体评价 || '暂无评价');
+        const cleanedSuggestions = cleanMarkdownSymbols(eval.建议 || '');
+        const cleanedSupervisorAdvice = cleanMarkdownSymbols(skipStep.督导建议 || '');
+
         return `
             <div class="history-item">
                 <div class="evaluation-header">
@@ -366,18 +376,18 @@ function updateEvaluationHistory() {
                     <div class="evaluation-time">${formatTime(eval.timestamp)}</div>
                 </div>
                 <div class="evaluation-content">
-                    <strong>总体评价：</strong>${eval.总体评价 || '暂无评价'}
+                    <strong>总体评价：</strong>${cleanedOverallEvaluation}
                 </div>
                 ${eval.建议 ? `
                     <div class="evaluation-suggestions">
-                        <strong>建议：</strong>${eval.建议}
+                        <strong>建议：</strong>${cleanedSuggestions}
                     </div>
                 ` : ''}
                 ${hasSkipStep ? `
                     <div class="skip-step-warning small">
                         <span class="warning-icon">⚠️</span>
                         <strong>${skipStep.跳步类型 || '跳步'}</strong>
-                        ${skipStep.督导建议 ? `<div class="skip-step-detail">${skipStep.督导建议}</div>` : ''}
+                        ${skipStep.督导建议 ? `<div class="skip-step-detail">${cleanedSupervisorAdvice}</div>` : ''}
                     </div>
                 ` : `
                     <div class="skip-step-success small">
@@ -386,7 +396,6 @@ function updateEvaluationHistory() {
                     </div>
                 `}
             </div>
-        </div>
         `;
     }).join('');
 }
@@ -835,6 +844,41 @@ function exportConversationHistory() {
 }
 
 // ========== 工具函数 ==========
+
+// 清理文本中的Markdown符号，使其更像自然语言
+function cleanMarkdownSymbols(text) {
+    if (!text) return text;
+
+    return text
+        // 移除加粗符号（**text** 或 __text__）
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/__(.*?)__/g, '$1')
+        // 移除斜体符号（*text* 或 _text_）
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/_(.*?)_/g, '$1')
+        // 移除列表标记（- item, * item, + item, 1. item）
+        .replace(/^[\s]*[-*+]\s+/gm, '')
+        .replace(/^[\s]*\d+\.\s+/gm, '')
+        // 移除引用符号（> text）
+        .replace(/^[\s]*>\s+/gm, '')
+        // 移除行内代码（`code`）
+        .replace(/`(.*?)`/g, '$1')
+        // 移除代码块（```code```）
+        .replace(/```[\s\S]*?```/g, (match) => {
+            return match.replace(/```/g, '').trim();
+        })
+        // 移除链接格式（[text](url)）
+        .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+        // 移除标题标记（# ## ### 等）
+        .replace(/^[\s]*#{1,6}\s+/gm, '')
+        // 移除特殊引号（『text』「text」）
+        .replace(/『(.*?)』/g, '$1')
+        .replace(/「(.*?)」/g, '$1')
+        // 清理多余的空格和换行
+        .replace(/\n\s*\n/g, '\n')
+        .replace(/^\s+|\s+$/g, '')
+        .replace(/\s+/g, ' ');
+}
 
 function extractJsonObjectFromText(text) {
     if (!text) return null;
