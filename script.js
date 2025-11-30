@@ -841,7 +841,8 @@ function exportConversationHistory() {
             averageScore: calculateAverageScore(session.evaluations),
             hasSkipStepIssues: hasSkipStepIssues(session.evaluations),
             messages: session.messages,
-            evaluations: session.evaluations
+            // 评价记录按时间正序排列（从旧到新）
+            evaluations: [...session.evaluations].reverse()
         }))
     };
 
@@ -938,13 +939,45 @@ function extractJsonObjectFromText(text) {
         startIndex = text.indexOf('{', startIndex + 1);
     }
     
-    // 如果没有找到完美匹配，尝试返回最后一个包含关键字的匹配项（即使解析失败也返回，交给调用者处理）
-    // 或者返回最后一个匹配项
+    // 如果没有找到完美匹配，尝试返回最后一个包含关键字的匹配项
     const keywordMatches = matches.filter(m => 
         m.includes('"综合得分"') || m.includes('"conversation_stage_curve"')
     );
     
-    return keywordMatches.length > 0 ? keywordMatches[keywordMatches.length - 1] : (matches.length > 0 ? matches[matches.length - 1] : null);
+    if (keywordMatches.length > 0) {
+        return keywordMatches[keywordMatches.length - 1];
+    }
+    
+    // ========== 增强的Fallback逻辑 ==========
+    // 如果上述严格解析都失败了（例如因为JSON截断、格式错误等导致depth无法归零）
+    // 我们尝试通过关键字反向查找最近的 '{' 并截取到末尾
+    
+    const keywords = [
+        '"综合得分"', '"总体评价"', '"跳步判断"', 
+        '"conversation_stage_curve"', '"session_emotion_timeline"', 
+        '"stress_curve"', '"emotion_curve"'
+    ];
+    
+    let lastKeywordIndex = -1;
+    for (const keyword of keywords) {
+        const index = text.lastIndexOf(keyword);
+        if (index > lastKeywordIndex) {
+            lastKeywordIndex = index;
+        }
+    }
+    
+    if (lastKeywordIndex !== -1) {
+        // 找到关键字前的最近一个 '{'
+        const startBraceIndex = text.lastIndexOf('{', lastKeywordIndex);
+        if (startBraceIndex !== -1) {
+            // 假设从这里开始到文本结束都是JSON（或意图是JSON）
+            // 这样可以确保即使JSON不完整，我们也能将其从显示文本中移除
+            console.log('使用Fallback策略提取JSON片段');
+            return text.slice(startBraceIndex);
+        }
+    }
+
+    return matches.length > 0 ? matches[matches.length - 1] : null;
 }
 
 // 计算平均得分
