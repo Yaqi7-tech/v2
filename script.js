@@ -117,11 +117,18 @@ async function callVisitorAgent(message) {
 
     // 解析响应：分离文本和JSON数据
     let visitorText = response.answer;
-    try {
-        const jsonText = extractJsonObjectFromText(response.answer);
-        if (jsonText) {
-            console.log('提取到来访者数据JSON:', jsonText);
-            
+    
+    // 先尝试提取JSON
+    const jsonText = extractJsonObjectFromText(response.answer);
+    
+    if (jsonText) {
+        console.log('提取到来访者数据JSON:', jsonText);
+        
+        // 立即从文本中移除JSON部分，无论解析是否成功
+        // 这样可以防止JSON代码出现在聊天界面中
+        visitorText = response.answer.replace(jsonText, '').trim();
+        
+        try {
             // 尝试清理JSON中的潜在错误
             let cleanJsonText = jsonText
                 // 移除数组中最后一个元素后的逗号
@@ -142,7 +149,6 @@ async function callVisitorAgent(message) {
                 // 尝试进一步修复
                 try {
                     // 1. 尝试将换行符替换为空格
-                    // 这样既处理了字符串中的非法换行，也保留了JSON结构（空格是合法空白符）
                     const fixedJson = cleanJsonText.replace(/\n/g, ' ');
                     chartData = JSON.parse(fixedJson);
                     console.log('替换换行符为空格后解析成功');
@@ -155,16 +161,15 @@ async function callVisitorAgent(message) {
             if (chartData) {
                 // 更新图表数据
                 updateChartsData(chartData);
-                
-                // 从响应中移除JSON部分，只保留对话文本
-                // 使用原始提取的文本进行替换，确保匹配成功
-                visitorText = response.answer.replace(jsonText, '').trim();
             }
+        } catch (e) {
+            console.warn('处理来访者数据失败:', e);
         }
-    } catch (e) {
-        console.warn('处理来访者数据失败:', e);
-        // 失败则忽略数据更新，只显示原始文本
     }
+
+    // 移除括号及其内容（包括中文和英文括号）
+    // 仅在显示给用户之前移除，用于净化聊天内容
+    visitorText = visitorText.replace(/（.*?）/g, '').replace(/\(.*?\)/g, '').trim();
 
     return visitorText;
 }
