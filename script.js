@@ -117,54 +117,24 @@ async function callVisitorAgent(message) {
 
     // 解析响应：分离文本和JSON数据
     let visitorText = response.answer;
-    
-    // 先尝试提取JSON
-    const jsonText = extractJsonObjectFromText(response.answer);
-    
-    if (jsonText) {
-        console.log('提取到来访者数据JSON:', jsonText);
-        
-        // 立即从文本中移除JSON部分，无论解析是否成功
-        // 这样可以防止JSON代码出现在聊天界面中
-        visitorText = response.answer.replace(jsonText, '').trim();
-        
-        try {
-            // 尝试清理JSON中的潜在错误
-            let cleanJsonText = jsonText
-                // 移除数组中最后一个元素后的逗号
-                .replace(/,(\s*])/g, '$1')
-                // 移除对象中最后一个属性后的逗号
-                .replace(/,(\s*})/g, '$1')
-                // 移除不可见字符 (保留换行符，但在JSON字符串中换行符需要转义)
-                // 这里只移除除了换行符之外的控制字符
-                .replace(/[\u0000-\u0009\u000B-\u001F\u200B-\u200D\u202A-\u202E\u2060-\u206F\uFEFF]/g, '');
-                
-            console.log('清理后的JSON:', cleanJsonText);
-            
-            let chartData = null;
-            try {
-                chartData = JSON.parse(cleanJsonText);
-            } catch (parseError) {
-                console.warn('标准JSON解析失败，尝试修复:', parseError);
-                // 尝试进一步修复
-                try {
-                    // 1. 尝试将换行符替换为空格
-                    const fixedJson = cleanJsonText.replace(/\n/g, ' ');
-                    chartData = JSON.parse(fixedJson);
-                    console.log('替换换行符为空格后解析成功');
-                } catch (retryError) {
-                    console.error('JSON修复失败:', retryError);
-                    updateStatus('数据解析异常，图表可能未更新', 'error');
-                }
-            }
+    let chartData = null;
 
-            if (chartData) {
-                // 更新图表数据
-                updateChartsData(chartData);
-            }
-        } catch (e) {
-            console.warn('处理来访者数据失败:', e);
+    // 使用改进的JSON提取和清理函数
+    const jsonExtraction = extractAndCleanAllJsonFromText(response.answer);
+
+    if (jsonExtraction.cleanText && jsonExtraction.cleanText !== response.answer) {
+        console.log('成功提取并清理JSON数据');
+        visitorText = jsonExtraction.cleanText;
+
+        if (jsonExtraction.parsedJson) {
+            chartData = jsonExtraction.parsedJson;
+            console.log('成功解析JSON图表数据:', chartData);
         }
+    }
+
+    // 更新图表数据
+    if (chartData) {
+        updateChartsData(chartData);
     }
 
     // 移除括号及其内容（包括中文和英文括号）
@@ -983,6 +953,139 @@ function extractJsonObjectFromText(text) {
     }
 
     return matches.length > 0 ? matches[matches.length - 1] : null;
+}
+
+// 改进的JSON提取和清理函数
+function extractAndCleanAllJsonFromText(text) {
+    if (!text) return { cleanText: text, parsedJson: null };
+
+    console.log('开始提取和清理JSON，原始文本长度:', text.length);
+
+    // 查找所有可能的JSON块
+    const jsonMatches = [];
+    let startIndex = text.indexOf('{');
+
+    while (startIndex !== -1) {
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+        let jsonStart = -1;
+
+        for (let i = startIndex; i < text.length; i++) {
+            const ch = text[i];
+
+            // 处理转义字符
+            if (escape) {
+                escape = false;
+                continue;
+            }
+
+            if (ch === '\\') {
+                escape = true;
+                continue;
+            }
+
+            // 处理字符串
+            if (ch === '"') {
+                inString = !inString;
+            }
+
+            if (!inString) {
+                if (ch === '{') {
+                    depth++;
+                    if (depth === 1) {
+                        jsonStart = i;
+                    }
+                } else if (ch === '}') {
+                    depth--;
+                    if (depth === 0 && jsonStart !== -1) {
+                        const candidate = text.slice(jsonStart, i + 1);
+
+                        // 验证是否包含图表相关的关键字段
+                        const hasChartData = candidate.includes('"conversation_stage_curve"') ||
+                                          candidate.includes('"session_emotion_timeline"') ||
+                                          candidate.includes('"stress_curve"') ||
+                                          candidate.includes('"emotion_curve"') ||
+                                          candidate.includes('"对话阶段"') ||
+                                          candidate.includes('"情绪波动"');
+
+                        if (hasChartData) {
+                            jsonMatches.push({
+                                text: candidate,
+                                start: jsonStart,
+                                end: i + 1
+                            });
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        startIndex = text.indexOf('{', startIndex + 1);
+    }
+
+    console.log('找到', jsonMatches.length, '个JSON块');
+
+    if (jsonMatches.length === 0) {
+        return { cleanText: text, parsedJson: null };
+    }
+
+    // 从后往前提取，使用最后一个（通常是最新/最完整的）JSON
+    const lastJsonMatch = jsonMatches[jsonMatches.length - 1];
+    console.log('使用最后一个JSON块:', lastJsonMatch.text.substring(0, 100) + '...');
+
+    let parsedJson = null;
+    try {
+        // 清理JSON中的常见错误
+        let cleanJson = lastJsonMatch.text
+            .replace(/,(\s*])/g, '$1')  // 移除数组中最后一个元素后的逗号
+            .replace(/,(\s*})/g, '$1')  // 移除对象中最后一个属性后的逗号
+            .replace(/[\u0000-\u001F\u200B-\u200D\u202A-\u202E\u2060-\u206F\uFEFF]/g, ''); // 移除不可见字符
+
+        console.log('清理后的JSON长度:', cleanJson.length);
+
+        parsedJson = JSON.parse(cleanJson);
+        console.log('JSON解析成功');
+    } catch (error) {
+        console.warn('JSON解析失败，尝试修复:', error.message);
+
+        // 尝试修复常见问题
+        try {
+            let fixedJson = lastJsonMatch.text
+                .replace(/\n/g, ' ')  // 换行符替换为空格
+                .replace(/\s+/g, ' ')  // 多个空格合并为一个
+                .replace(/,(\s*])/g, '$1')
+                .replace(/,(\s*})/g, '$1')
+                .replace(/[\u0000-\u001F\u200B-\u200D\u202A-\u202E\u2060-\u206F\uFEFF]/g, '');
+
+            parsedJson = JSON.parse(fixedJson);
+            console.log('修复后JSON解析成功');
+        } catch (retryError) {
+            console.error('JSON修复失败:', retryError.message);
+        }
+    }
+
+    // 清理所有JSON块，移除所有匹配的JSON文本
+    let cleanText = text;
+    // 从后往前移除，避免位置偏移
+    for (let i = jsonMatches.length - 1; i >= 0; i--) {
+        const match = jsonMatches[i];
+        cleanText = cleanText.slice(0, match.start) + cleanText.slice(match.end);
+    }
+
+    // 清理额外的空白字符
+    cleanText = cleanText
+        .replace(/\n\s*\n/g, '\n')  // 移除多余的空行
+        .replace(/^\s+|\s+$/g, '')  // 移除首尾空白
+        .replace(/\s+/g, ' ');  // 合并多个空格
+
+    console.log('清理后的文本长度:', cleanText.length);
+
+    return {
+        cleanText: cleanText.trim(),
+        parsedJson: parsedJson
+    };
 }
 
 // 计算平均得分
