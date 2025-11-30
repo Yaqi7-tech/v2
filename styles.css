@@ -245,12 +245,43 @@ button:disabled {
 .evaluation-history {
     border-top: 1px solid #ecf0f1;
     padding-top: 15px;
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .evaluation-history h3 {
     color: #2c3e50;
     margin-bottom: 10px;
     font-size: 16px;
+    flex-shrink: 0;
+}
+
+#historyList {
+    overflow-y: auto;
+    flex: 1;
+    padding-right: 5px;
+    max-height: 300px; /* 限制最大高度，防止无限延伸 */
+}
+
+/* 美化滚动条 */
+#historyList::-webkit-scrollbar {
+    width: 6px;
+}
+
+#historyList::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+#historyList::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+#historyList::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
 }
 
 .history-item {
